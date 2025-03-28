@@ -58,6 +58,9 @@ window.mousePressed = function() {
   if(mode === "fill") {
     pg.loadPixels();
     let targetColor = pg.get(mouseX, mouseY);
+    if (!colorsMatch(targetColor, pg.get(mouseX, mouseY))) {
+      targetColor = pg.get(mouseX, mouseY);
+    }
     floodFill(mouseX, mouseY, targetColor);
     pg.updatePixels();
     drawing = false;
@@ -87,16 +90,23 @@ function Shape(type) {
     
     switch(this.type) {
       case "ellipse":
-        ellipse(startX + w/2, startY + h/2, abs(w), abs(h));
+        arc(startX + w/2, startY + h/2, abs(w), abs(h), 0, TWO_PI);
         break;
       case "rectangle":
         rect(startX, startY, w, h);
         break;
       case "triangle":
-        triangle(startX + w/2, startY, startX, startY + h, startX + w, startY + h);
+        beginShape();
+        vertex(startX + w/2, startY);
+        vertex(startX, startY + h);
+        vertex(startX + w, startY + h);
+        endShape(CLOSE);
         break;
       case "line":
-        line(startX, startY, x, y);
+        beginShape();
+        vertex(startX, startY);
+        vertex(x, y);
+        endShape();
         break;
       case "free":
         pg.stroke(currentColor);
@@ -134,16 +144,23 @@ function Shape(type) {
     
     switch(this.type) {
       case "ellipse":
-        pg.ellipse(startX + w/2, startY + h/2, abs(w), abs(h));
+        pg.arc(startX + w/2, startY + h/2, abs(w), abs(h), 0, TWO_PI);
         break;
       case "rectangle":
         pg.rect(startX, startY, w, h);
         break;
       case "triangle":
-        pg.triangle(startX + w/2, startY, startX, startY + h, startX + w, startY + h);
+        pg.beginShape();
+        pg.vertex(startX + w/2, startY);
+        pg.vertex(startX, startY + h);
+        pg.vertex(startX + w, startY + h);
+        pg.endShape(pg.CLOSE);
         break;
       case "line":
-        pg.line(startX, startY, x, y);
+        pg.beginShape();
+        pg.vertex(startX, startY);
+        pg.vertex(x, y);
+        pg.endShape();
         break;
     }
     pg.pop();
@@ -156,7 +173,6 @@ function initializeEventListeners() {
   });
 
   clearCanvas.addEventListener("click", function() {
-    pg.clear();
     pg.background(backgroundColor);
   });
 
@@ -201,8 +217,8 @@ function initializeEventListeners() {
   });
 
   colorPicker.addEventListener("input", function() {
-    currentColor = this.value;
-    selectedColor.style.backgroundColor = currentColor;
+    currentColor = color(this.value);
+    selectedColor.style.backgroundColor = this.value;
   });
 
   bucket.addEventListener("click", function() {
@@ -228,31 +244,46 @@ let directions = [
 
 function floodFill(x, y, targetColor) {
   let stack = [[x, y]];
-  let replacementColor = color(currentColor);
-  
-  while(stack.length > 0) {
+  let fillColor = currentColor;
+  let visited = new Set();
+
+  while (stack.length > 0) {
     let [currentX, currentY] = stack.pop();
-    if(!isValidPixel(currentX, currentY, targetColor)) continue;
-    
-    pg.set(currentX, currentY, replacementColor);
-    
-    for(let [dx, dy] of directions) {
-      stack.push([currentX + dx, currentY + dy]);
+    let key = `${currentX},${currentY}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    if (!isValidPixel(currentX, currentY, targetColor)) continue;
+
+    pg.set(currentX, currentY, fillColor);
+
+    for (let [dx, dy] of directions) {
+      let newX = currentX + dx;
+      let newY = currentY + dy;
+      if (isValidPixel(newX, newY, targetColor)) {
+        stack.push([newX, newY]);
+      }
     }
   }
+  pg.updatePixels();
 }
 
 function isValidPixel(x, y, targetColor) {
   if (x < 0 || x >= pg.width || y < 0 || y >= pg.height) return false;
   let currentColor = pg.get(x, y);
-  return colorsMatch(currentColor, targetColor);
+  return (
+    currentColor[0] === targetColor[0] &&
+    currentColor[1] === targetColor[1] &&
+    currentColor[2] === targetColor[2]
+  );
 }
 
 function colorsMatch(c1, c2) {
-  return c1[0] === c2[0] && 
-         c1[1] === c2[1] && 
-         c1[2] === c2[2] && 
-         c1[3] === c2[3];
+  return (
+    Math.abs(c1[0] - c2[0]) < 5 &&
+    Math.abs(c1[1] - c2[1]) < 5 &&
+    Math.abs(c1[2] - c2[2]) < 5
+  );
 }
 
 window.onload = function() {
